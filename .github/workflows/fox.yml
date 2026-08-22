@@ -6,26 +6,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y git repo ccache python3
-      - name: Sync OrangeFox 12.1
+      - name: Free space
         run: |
-          mkdir -p ~/fox && cd ~/fox
-          repo init -u https://github.com/OrangeFoxRecovery/manifest -b fox_12.1 --depth=1
-          repo sync -c -j4 --no-tags --no-clone-bundle
-          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 device/samsung/r7
-          cp device/samsung/r7/orangefox_r7.mk device/samsung/r7/omni_r7.mk
-          echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> device/samsung/r7/BoardConfig.mk
-          echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> device/samsung/r7/BoardConfig.mk
-          echo 'OF_AB_DEVICE := 0' >> device/samsung/r7/BoardConfig.mk
+          sudo apt-get update
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost 2>/dev/null || true
+          sudo apt-get install -y git python3 ccache
+          df -h
+      - name: OrangeFox sync 12.1
+        run: |
+          mkdir -p ~/OrangeFox_sync
+          git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
+          cd ~/OrangeFox_sync/sync
+          ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1 2>&1 | tail -n 50
+          ls ~/fox_12.1 2>&1 | head -n 20
+      - name: Add device tree
+        run: |
+          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
+          cp ~/fox_12.1/device/samsung/r7/orangefox_r7.mk ~/fox_12.1/device/samsung/r7/omni_r7.mk
+          echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          echo 'OF_AB_DEVICE := 0' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
       - name: Build
         run: |
-          cd ~/fox
+          cd ~/fox_12.1
           source build/envsetup.sh
           lunch omni_r7-eng
-          mka adbd recoveryimage -j4
+          mka adbd recoveryimage -j$(nproc) 2>&1 | tail -n 50
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: OrangeFox-r7
-          path: ~/fox/out/target/product/r7/OrangeFox*.img
+          path: ~/fox_12.1/out/target/product/r7/OrangeFox*.img
