@@ -1,0 +1,31 @@
+name: OrangeFox Build
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y git repo ccache python3
+      - name: Sync OrangeFox 12.1
+        run: |
+          mkdir -p ~/fox && cd ~/fox
+          repo init -u https://github.com/OrangeFoxRecovery/manifest -b fox_12.1 --depth=1
+          repo sync -c -j4 --no-tags --no-clone-bundle
+          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 device/samsung/r7
+          cp device/samsung/r7/orangefox_r7.mk device/samsung/r7/omni_r7.mk
+          echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> device/samsung/r7/BoardConfig.mk
+          echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> device/samsung/r7/BoardConfig.mk
+          echo 'OF_AB_DEVICE := 0' >> device/samsung/r7/BoardConfig.mk
+      - name: Build
+        run: |
+          cd ~/fox
+          source build/envsetup.sh
+          lunch omni_r7-eng
+          mka adbd recoveryimage -j4
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrangeFox-r7
+          path: ~/fox/out/target/product/r7/OrangeFox*.img
