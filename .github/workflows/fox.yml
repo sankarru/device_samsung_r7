@@ -19,33 +19,33 @@ jobs:
           df -h
       - name: OrangeFox sync 12.1
         run: |
-          set -x
           mkdir -p ~/OrangeFox_sync
           git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
           cd ~/OrangeFox_sync/sync
           ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1
           ls ~/fox_12.1 | head -n 20
-          ls ~/fox_12.1/build 2>&1 | head
       - name: Add device tree
         run: |
           set -x
           git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
-          cp ~/fox_12.1/device/samsung/r7/orangefox_r7.mk ~/fox_12.1/device/samsung/r7/omni_r7.mk
-          cat ~/fox_12.1/device/samsung/r7/omni_r7.mk | head -n 20
+          # OrangeFox: keep twrp_r7.mk product, add fox inheritance
+          grep -q "vendor/fox" ~/fox_12.1/device/samsung/r7/twrp_r7.mk || sed -i 's|vendor/twrp/config/common.mk|vendor/fox/config/common.mk|' ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_AB_DEVICE := 0' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          cat ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head -n 20
           cat ~/fox_12.1/device/samsung/r7/BoardConfig.mk | tail -n 20
       - name: Build
         run: |
           set -x
           cd ~/fox_12.1
-          ls build/envsetup.sh 2>&1 | head
           source build/envsetup.sh
-          lunch omni_r7-eng 2>&1 | head -n 50
-          mka -j4 adbd recoveryimage 2>&1 | tee /tmp/build.log | tail -n 200
+          lunch twrp_r7-eng 2>&1 | tail -n 50
+          mka -j4 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 200
           echo "EXIT:$?"
-          ls out/target/product/r7/*.img 2>&1 | head
+          ls -lh out/target/product/r7/*.img 2>&1 | head -n 20
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
