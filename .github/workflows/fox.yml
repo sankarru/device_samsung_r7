@@ -6,12 +6,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Free space
+      - name: Free space + deps
         run: |
-          sudo apt-get update
           df -h
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost 2>/dev/null || true
-          sudo apt-get install -y git python3 ccache
+          sudo apt-get update
+          sudo apt-get install -y git python3 ccache curl
+          # install repo
+          mkdir -p ~/bin
+          curl -L https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod +x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
           df -h
       - name: OrangeFox sync 12.1
         run: |
@@ -32,7 +37,7 @@ jobs:
           cd ~/fox_12.1
           source build/envsetup.sh
           lunch omni_r7-eng
-          mka adbd recoveryimage -j$(nproc) 2>&1 | tail -n 50
+          mka adbd recoveryimage -j$(nproc) 2>&1 | tail -n 100
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
