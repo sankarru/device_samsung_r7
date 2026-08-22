@@ -16,36 +16,32 @@ jobs:
           curl -L https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod +x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
-          df -h
       - name: OrangeFox sync 12.1
         run: |
           mkdir -p ~/OrangeFox_sync
           git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
           cd ~/OrangeFox_sync/sync
-          ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1
+          ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1 || cat /tmp/*.log 2>&1 | tail -n 50
           ls ~/fox_12.1 | head -n 20
       - name: Add device tree
         run: |
           set -x
-          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
-          # OrangeFox: keep twrp_r7.mk product, add fox inheritance
-          grep -q "vendor/fox" ~/fox_12.1/device/samsung/r7/twrp_r7.mk || sed -i 's|vendor/twrp/config/common.mk|vendor/fox/config/common.mk|' ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7 || true
+          sed -i 's|vendor/twrp/config/common.mk|vendor/fox/config/common.mk|' ~/fox_12.1/device/samsung/r7/twrp_r7.mk || true
           echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          echo 'OF_AB_DEVICE := 0' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          cat ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head -n 20
-          cat ~/fox_12.1/device/samsung/r7/BoardConfig.mk | tail -n 20
       - name: Build
         run: |
-          set -x
+          set +e
           cd ~/fox_12.1
+          set -x
           source build/envsetup.sh
-          lunch twrp_r7-eng 2>&1 | tail -n 50
-          mka -j4 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 200
-          echo "EXIT:$?"
-          ls -lh out/target/product/r7/*.img 2>&1 | head -n 20
+          echo "envsetup exit:$?"
+          lunch twrp_r7-eng 2>&1 | cat
+          echo "lunch exit:$?"
+          mka -j4 recoveryimage 2>&1 | tail -n 200
+          echo "mka exit:$?"
+          ls -lh out/target/product/r7/*.img 2>&1 | head
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
