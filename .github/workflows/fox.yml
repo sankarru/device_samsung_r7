@@ -20,32 +20,22 @@ jobs:
           git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
           cd ~/OrangeFox_sync/sync
           ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1
-          echo "=== vendor ==="
-          ls -R ~/fox_12.1/vendor 2>&1 | head -n 100
-          echo "=== vendor/recovery ==="
-          ls ~/fox_12.1/vendor/recovery 2>&1 | head -n 30
-          echo "=== vendor/fox ==="
-          ls ~/fox_12.1/vendor/fox 2>&1 | head -n 30
-          echo "=== vendor/twrp ==="
-          ls ~/fox_12.1/vendor/twrp 2>&1 | head -n 30
-          echo "=== find common.mk ==="
+          ls ~/fox_12.1/vendor 2>&1 | head -n 20
           find ~/fox_12.1/vendor -name "common.mk" 2>&1 | head -n 20
+          ls ~/fox_12.1/bootable/recovery 2>&1 | head -n 20
       - name: Add device tree
         run: |
           set -x
           git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7 || true
-          find ~/fox_12.1/vendor -name "common.mk" 2>&1 | head
-          VENDOR_MK=$(find ~/fox_12.1/vendor -name "common.mk" 2>&1 | grep -E "fox|recovery|twrp" | head -1)
-          echo "found $VENDOR_MK"
-          if [ -n "$VENDOR_MK" ]; then
-            VENDOR_PATH=$(echo $VENDOR_MK | sed "s|~/fox_12.1/||" | sed "s|/home/runner/fox_12.1/||")
-            echo "using $VENDOR_PATH"
-            sed -i "s|vendor/twrp/config/common.mk|$VENDOR_PATH|" ~/fox_12.1/device/samsung/r7/twrp_r7.mk || true
-            sed -i "s|vendor/fox/config/common.mk|$VENDOR_PATH|" ~/fox_12.1/device/samsung/r7/twrp_r7.mk || true
-          fi
-          grep -n "vendor" ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head
+          ls ~/fox_12.1/device/samsung/r7 2>&1 | head -n 20
+          cat ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head -n 20
+          # keep vendor/twrp (exists), just add Fox flags to BoardConfig
           echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          echo 'OF_AB_DEVICE := 0' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          cat ~/fox_12.1/device/samsung/r7/BoardConfig.mk | tail -n 20
       - name: Build
         run: |
           set +e
