@@ -22,29 +22,29 @@ jobs:
           git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
           cd ~/OrangeFox_sync/sync
           ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1
-          ls ~/fox_12.1/device 2>&1 | head -n 20
+          ls ~/fox_12.1/vendor 2>&1 | head -n 20
+          ls ~/fox_12.1/vendor/recovery 2>&1 | head -n 20
+          ls ~/fox_12.1/vendor/fox 2>&1 | head -n 20
       - name: Add device tree
         run: |
           set -x
-          ls ~/fox_12.1/device/samsung 2>&1 | head
           git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
-          ls ~/fox_12.1/device/samsung/r7 2>&1 | head -n 20
-          cat ~/fox_12.1/device/samsung/r7/AndroidProducts.mk 2>&1 | head
-          sed -i 's|vendor/twrp/config/common.mk|vendor/fox/config/common.mk|' ~/fox_12.1/device/samsung/r7/twrp_r7.mk || true
-          grep -n "fox\|twrp" ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head
+          ls ~/fox_12.1/device/samsung/r7/twrp_r7.mk 2>&1 | head
+          # fix vendor path: OrangeFox vendor is vendor/recovery or vendor/fox
+          if [ -f ~/fox_12.1/vendor/recovery/config/common.mk ]; then VENDOR_PATH="vendor/recovery/config/common.mk"; elif [ -f ~/fox_12.1/vendor/fox/config/common.mk ]; then VENDOR_PATH="vendor/fox/config/common.mk"; else VENDOR_PATH="vendor/recovery/config/common.mk"; fi
+          echo "using $VENDOR_PATH"
+          sed -i "s|vendor/twrp/config/common.mk|$VENDOR_PATH|" ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          sed -i "s|vendor/fox/config/common.mk|$VENDOR_PATH|" ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          grep -n "vendor" ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head
           echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
+          ls ~/fox_12.1/vendor 2>&1 | head
       - name: Build
         run: |
           set +e
           cd ~/fox_12.1
-          ls device/samsung/r7/AndroidProducts.mk 2>&1 | head
-          cat device/samsung/r7/AndroidProducts.mk 2>&1 | head
           source build/envsetup.sh
-          echo "--- lunch ---"
-          lunch twrp_r7-eng 2>&1 | cat
-          echo "lunch exit:$?"
-          echo "--- mka ---"
+          lunch twrp_r7-eng 2>&1 | tail -n 50
           mka -j4 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 300
           echo "mka exit:$?"
           ls -lh out/target/product/r7/*.img 2>&1 | head -n 20
