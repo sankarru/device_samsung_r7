@@ -8,43 +8,45 @@ jobs:
         uses: actions/checkout@v4
       - name: Free space + deps
         run: |
+          df -h
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost 2>/dev/null || true
           sudo apt-get update && sudo apt-get install -y git python3 ccache curl gperf
           mkdir -p ~/bin
           curl -L https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod +x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
+          # add swap for soong (needs 16GB, runner has 15.6GB)
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+          df -h
       - name: OrangeFox sync 12.1
         run: |
           mkdir -p ~/OrangeFox_sync
           git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
           cd ~/OrangeFox_sync/sync
           ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1
-          ls ~/fox_12.1/vendor 2>&1 | head -n 20
-          find ~/fox_12.1/vendor -name "common.mk" 2>&1 | head -n 20
-          ls ~/fox_12.1/bootable/recovery 2>&1 | head -n 20
       - name: Add device tree
         run: |
-          set -x
-          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7 || true
-          ls ~/fox_12.1/device/samsung/r7 2>&1 | head -n 20
-          cat ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head -n 20
-          # keep vendor/twrp (exists), just add Fox flags to BoardConfig
+          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
+          # keep vendor/twrp, add Fox flags
           echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_AB_DEVICE := 0' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          cat ~/fox_12.1/device/samsung/r7/BoardConfig.mk | tail -n 20
       - name: Build
         run: |
           set +e
           cd ~/fox_12.1
           source build/envsetup.sh
-          lunch twrp_r7-eng 2>&1 | tail -n 50
-          mka -j4 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 300
-          echo "mka exit:$?"
+          lunch twrp_r7-eng
+          mka -j2 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 500
+          echo "mka exit:${PIPESTATUS[0]}"
           ls -lh out/target/product/r7/*.img 2>&1 | head -n 20
+          cat /tmp/build.log 2>&1 | grep -i "error" | tail -n 50
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
