@@ -8,10 +8,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Free space + deps
         run: |
-          df -h
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost 2>/dev/null || true
-          sudo apt-get update
-          sudo apt-get install -y git python3 ccache curl gperf
+          sudo apt-get update && sudo apt-get install -y git python3 ccache curl gperf
           mkdir -p ~/bin
           curl -L https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod +x ~/bin/repo
@@ -22,29 +20,39 @@ jobs:
           git clone https://gitlab.com/OrangeFox/sync.git ~/OrangeFox_sync/sync
           cd ~/OrangeFox_sync/sync
           ./orangefox_sync.sh --branch 12.1 --path ~/fox_12.1
-          ls ~/fox_12.1/vendor 2>&1 | head -n 20
-          ls ~/fox_12.1/vendor/recovery 2>&1 | head -n 20
-          ls ~/fox_12.1/vendor/fox 2>&1 | head -n 20
+          echo "=== vendor list ==="
+          ls -R ~/fox_12.1/vendor 2>&1 | head -n 100
+          echo "=== bootable/recovery ==="
+          ls ~/fox_12.1/bootable/recovery 2>&1 | head -n 20
       - name: Add device tree
         run: |
           set -x
-          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
+          git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7 || true
           ls ~/fox_12.1/device/samsung/r7/twrp_r7.mk 2>&1 | head
-          # fix vendor path: OrangeFox vendor is vendor/recovery or vendor/fox
-          if [ -f ~/fox_12.1/vendor/recovery/config/common.mk ]; then VENDOR_PATH="vendor/recovery/config/common.mk"; elif [ -f ~/fox_12.1/vendor/fox/config/common.mk ]; then VENDOR_PATH="vendor/fox/config/common.mk"; else VENDOR_PATH="vendor/recovery/config/common.mk"; fi
-          echo "using $VENDOR_PATH"
-          sed -i "s|vendor/twrp/config/common.mk|$VENDOR_PATH|" ~/fox_12.1/device/samsung/r7/twrp_r7.mk
-          sed -i "s|vendor/fox/config/common.mk|$VENDOR_PATH|" ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          cat ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head -n 20
+          ls ~/fox_12.1/vendor 2>&1 | head -n 20
+          ls ~/fox_12.1/vendor/fox 2>&1 | head -n 20
+          ls ~/fox_12.1/vendor/recovery 2>&1 | head -n 20
+          ls ~/fox_12.1/vendor/twrp 2>&1 | head -n 20
+          # OrangeFox: use vendor/fox if exists else keep twrp
+          if [ -f ~/fox_12.1/vendor/fox/config/common.mk ]; then
+            echo "using vendor/fox"
+            sed -i 's|vendor/twrp/config/common.mk|vendor/fox/config/common.mk|' ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          elif [ -f ~/fox_12.1/vendor/recovery/config/common.mk ]; then
+            echo "using vendor/recovery"
+            sed -i 's|vendor/twrp/config/common.mk|vendor/recovery/config/common.mk|' ~/fox_12.1/device/samsung/r7/twrp_r7.mk
+          else
+            echo "keeping vendor/twrp"
+          fi
           grep -n "vendor" ~/fox_12.1/device/samsung/r7/twrp_r7.mk | head
           echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          ls ~/fox_12.1/vendor 2>&1 | head
       - name: Build
         run: |
           set +e
           cd ~/fox_12.1
           source build/envsetup.sh
-          lunch twrp_r7-eng 2>&1 | tail -n 50
+          lunch twrp_r7-eng 2>&1 | tail -n 100
           mka -j4 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 300
           echo "mka exit:$?"
           ls -lh out/target/product/r7/*.img 2>&1 | head -n 20
