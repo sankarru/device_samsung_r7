@@ -9,19 +9,19 @@ jobs:
       - name: Free space + deps
         run: |
           df -h
+          sudo swapoff /swapfile 2>/dev/null || true
+          sudo rm -f /swapfile 2>/dev/null || true
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost 2>/dev/null || true
           sudo apt-get update && sudo apt-get install -y git python3 ccache curl gperf
           mkdir -p ~/bin
           curl -L https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod +x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
-          # add swap for soong (needs 16GB, runner has 15.6GB)
-          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          sudo fallocate -l 8G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
-          free -h
-          df -h
+          free -h; df -h
       - name: OrangeFox sync 12.1
         run: |
           mkdir -p ~/OrangeFox_sync
@@ -31,12 +31,8 @@ jobs:
       - name: Add device tree
         run: |
           git clone https://github.com/sankarru/device_samsung_r7 -b twrp-12.1 ~/fox_12.1/device/samsung/r7
-          # keep vendor/twrp, add Fox flags
           echo 'FOX_BUILD_DEVICE := r7' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
           echo 'OF_MAINTAINER := sankarru' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          echo 'FOX_RECOVERY_SYSTEM_PARTITION := "/dev/block/mapper/system"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          echo 'FOX_RECOVERY_VENDOR_PARTITION := "/dev/block/mapper/vendor"' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
-          echo 'OF_AB_DEVICE := 0' >> ~/fox_12.1/device/samsung/r7/BoardConfig.mk
       - name: Build
         run: |
           set +e
@@ -46,7 +42,6 @@ jobs:
           mka -j2 recoveryimage 2>&1 | tee /tmp/build.log | tail -n 500
           echo "mka exit:${PIPESTATUS[0]}"
           ls -lh out/target/product/r7/*.img 2>&1 | head -n 20
-          cat /tmp/build.log 2>&1 | grep -i "error" | tail -n 50
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
